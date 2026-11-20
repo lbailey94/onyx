@@ -11,6 +11,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
+from onyx.connectors.microsoft_utils.drive_delta import DRIVE_ITEM_SHARED_PROPERTY
 from onyx.connectors.microsoft_utils.drive_items import (
     DRIVE_ITEM_DOWNLOAD_URL_SELECT,
     DRIVE_ITEM_SELECT_FIELDS,
@@ -21,12 +22,16 @@ from onyx.connectors.models import ListingPayload, SlimDocumentStub
 from onyx.file_processing.file_types import OnyxMimeTypes, is_indexable_file_type
 
 CANVAS_LAYOUT_PROPERTY = "canvasLayout"
-# The fields of a file that the listing maps. Not the download URL: the
-# listing downloads nothing, and conversion downloads by drive and item id.
+# The fields of a file that the listing maps, with the `shared` facet that
+# marks a file with permissions of its own. Not the download URL: the listing
+# downloads nothing, and conversion downloads by drive and item id.
 LISTING_SELECT_FIELDS = ",".join(
-    field
-    for field in DRIVE_ITEM_SELECT_FIELDS.split(",")
-    if field != DRIVE_ITEM_DOWNLOAD_URL_SELECT
+    [
+        field
+        for field in DRIVE_ITEM_SELECT_FIELDS.split(",")
+        if field != DRIVE_ITEM_DOWNLOAD_URL_SELECT
+    ]
+    + [DRIVE_ITEM_SHARED_PROPERTY]
 )
 
 
@@ -69,6 +74,14 @@ class SharepointListingPayload(ListingPayload):
     # run or another credential cached. None: conversion keeps the cache in
     # the process.
     listing_run_id: str | None = None
+    # The web URL of the library, to address the file's parent folder.
+    drive_web_url: str | None = None
+    # True only when the listing is certain that the file has no permissions
+    # of its own: Graph applied the `hierarchicalsharing` preference to the
+    # delta page, and the file has no `shared` facet. Conversion then gives
+    # the file the access of its parent, with no read for the file. False
+    # is the safe value: the file gets a permission read of its own.
+    inherits_permissions: bool = False
 
     # A site page: the site's Graph id, and the page as the listing returned
     # it, with no canvas.
@@ -100,6 +113,8 @@ def drive_item_stub(
     list_id: str | None,
     parent_hierarchy_raw_node_id: str,
     listing_run_id: str | None,
+    drive_web_url: str | None = None,
+    inherits_permissions: bool = False,
 ) -> SlimDocumentStub:
     return SlimDocumentStub(
         id=item.id,
@@ -127,6 +142,8 @@ def drive_item_stub(
             last_modified_by_display_name=item.last_modified_by_display_name,
             last_modified_by_email=item.last_modified_by_email,
             listing_run_id=listing_run_id,
+            drive_web_url=drive_web_url,
+            inherits_permissions=inherits_permissions,
         ),
     )
 
