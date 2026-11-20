@@ -10,10 +10,16 @@ from onyx.auth.users import current_chat_accessible_user
 from onyx.configs.constants import DEFAULT_PERSONA_ID
 from onyx.db.engine.sql_engine import get_session
 from onyx.db.models import User
+from onyx.error_handling.error_codes import OnyxErrorCode
+from onyx.error_handling.exceptions import OnyxError
 from onyx.server.features.suggested_questions.models import (
     MarkUsedRequest,
     PersonSuggestions,
     SuggestionsState,
+)
+from onyx.server.features.suggested_questions.on_demand import (
+    OnDemandSuggestions,
+    generate_on_demand,
 )
 from onyx.server.features.suggested_questions.ranking import get_suggestions
 from onyx.server.features.suggested_questions.scheduling import is_enabled
@@ -52,6 +58,18 @@ def get_suggested_questions(
     return get_suggestions(
         db_session, user, get_current_tenant_id(), seed=seed, poll=poll, now=now
     )
+
+
+@router.get("/on-demand")
+def generate_suggested_questions_on_demand(
+    user: User = Depends(current_chat_accessible_user),
+    db_session: Session = Depends(get_session),
+) -> OnDemandSuggestions:
+    """An experiment to measure the synchronous path: runs the whole pipeline
+    in this request, stores nothing, and returns the seconds per step."""
+    if user.is_anonymous or not _enabled():
+        raise OnyxError(OnyxErrorCode.NOT_FOUND, "Suggested questions are off")
+    return generate_on_demand(db_session, user, get_current_tenant_id())
 
 
 @router.post("/used")
