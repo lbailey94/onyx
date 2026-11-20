@@ -64,6 +64,11 @@ class SharepointListingPayload(ListingPayload):
     size: int | None = None
     last_modified_by_display_name: str | None = None
     last_modified_by_email: str | None = None
+    # The listing run that listed the document. Conversion keys the shared
+    # permission cache by it, so that a run never reads access that another
+    # run or another credential cached. None: conversion keeps the cache in
+    # the process.
+    listing_run_id: str | None = None
 
     # A site page: the site's Graph id, and the page as the listing returned
     # it, with no canvas.
@@ -94,6 +99,7 @@ def drive_item_stub(
     drive_name: str,
     list_id: str | None,
     parent_hierarchy_raw_node_id: str,
+    listing_run_id: str | None,
 ) -> SlimDocumentStub:
     return SlimDocumentStub(
         id=item.id,
@@ -120,6 +126,7 @@ def drive_item_stub(
             size=item.size,
             last_modified_by_display_name=item.last_modified_by_display_name,
             last_modified_by_email=item.last_modified_by_email,
+            listing_run_id=listing_run_id,
         ),
     )
 
@@ -149,7 +156,8 @@ def site_page_stub(
     *,
     site_id: str,
     site_url: str,
-    site_name: str | None = None,
+    site_name: str | None,
+    listing_run_id: str | None,
 ) -> SlimDocumentStub | None:
     """The stub of a listed site page, or None when the page has no id."""
     page_id = site_page.get("id")
@@ -178,5 +186,6 @@ def site_page_stub(
             site_id=site_id,
             site_name=site_name,
             site_page=metadata,
+            listing_run_id=listing_run_id,
         ),
     )
