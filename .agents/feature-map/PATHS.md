@@ -389,6 +389,7 @@ the admin routes and check that each has a row above, run
 | `backend/onyx/main.py`, `backend/ee/onyx/main.py`, `backend/onyx/setup.py` | App assembly: router and middleware registration and startup. Read the component of each router or middleware you change. |
 | `backend/onyx/cache/`, `backend/onyx/redis/`, `backend/onyx/key_value_store/`, `backend/onyx/db/encrypted_kv_store.py`, `backend/onyx/db/kv_store.py` | Cache and key-value libraries. Fences, rate limits and the stream buffer use them, so check the callers. |
 | `backend/onyx/error_handling/` | `OnyxError` and the error codes that clients see. |
+| `backend/onyx/server/features/suggested_questions/`, `backend/onyx/db/suggested_questions.py`, `backend/onyx/secondary_llm_flows/suggested_questions.py`, `backend/onyx/prompts/suggested_questions.py`, `backend/onyx/background/celery/tasks/suggested_questions/`, `web/src/lib/suggestedQuestions/` | Playground suggested questions (ENG-4487), an unmerged stack. The routes and tasks run only with `IS_PLAYGROUND`. Map it as a component when the stack merges. |
 | `backend/onyx/utils/` | Shared helpers. Check the callers. |
 | `backend/onyx/configs/`, `backend/ee/onyx/configs/app_configs.py`, `backend/shared_configs/` | Settings for every area. Read the component that documents the setting. |
 | `backend/onyx/server/runtime/` | `OnyxRuntime` resolves a setting from the database, the cache, env vars and defaults. |

@@ -6,9 +6,11 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from onyx.auth.permissions import require_permission
 from onyx.auth.users import current_chat_accessible_user
 from onyx.configs.constants import DEFAULT_PERSONA_ID
 from onyx.db.engine.sql_engine import get_session
+from onyx.db.enums import Permission
 from onyx.db.models import User
 from onyx.error_handling.error_codes import OnyxErrorCode
 from onyx.error_handling.exceptions import OnyxError
@@ -62,12 +64,13 @@ def get_suggested_questions(
 
 @router.get("/on-demand")
 def generate_suggested_questions_on_demand(
-    user: User = Depends(current_chat_accessible_user),
+    user: User = Depends(require_permission(Permission.FULL_ADMIN_PANEL_ACCESS)),
     db_session: Session = Depends(get_session),
 ) -> OnDemandSuggestions:
     """An experiment to measure the synchronous path: runs the whole pipeline
-    in this request, stores nothing, and returns the seconds per step."""
-    if user.is_anonymous or not _enabled():
+    in this request, stores nothing, and returns the seconds per step. Admins
+    only: each call pays for model calls and has no rate limit."""
+    if not _enabled():
         raise OnyxError(OnyxErrorCode.NOT_FOUND, "Suggested questions are off")
     return generate_on_demand(db_session, user, get_current_tenant_id())
 
