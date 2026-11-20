@@ -2,13 +2,11 @@
 and site page that indexing keeps, and it downloads nothing."""
 
 import time
-from collections.abc import Generator
-from datetime import datetime
+from typing import Any
 
 import pytest
 
 from onyx.connectors.load_all import load_all_from_connector
-from onyx.connectors.microsoft_utils.drive_delta import DriveDeltaPage
 from onyx.connectors.microsoft_utils.drive_items import (
     DRIVE_ITEM_DOWNLOAD_URL_PROPERTY,
     DriveItemData,
@@ -18,7 +16,6 @@ from onyx.connectors.models import (
     Document,
     ResolveTarget,
 )
-from onyx.connectors.sharepoint import connector as sharepoint_connector
 from onyx.connectors.sharepoint.listing import (
     SharepointListedKind,
     SharepointListingPayload,
@@ -79,27 +76,29 @@ def test_the_listing_has_a_stub_for_each_file_and_page_and_downloads_nothing(
 
 
 def test_the_listing_selects_no_download_url(
-    mock_sharepoint: MockSharepoint, monkeypatch: pytest.MonkeyPatch
+    own_mock_sharepoint: MockSharepoint, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The delta pages of the listing do not carry the download URL of each
-    file: the listing downloads nothing."""
-    listed_files = 0
-    original = sharepoint_connector.iter_delta_page_files
+    """No item that the listing reads carries a download URL: not on the
+    folder walk of a full pass, its catch-up delta, or an incremental delta.
+    The listing downloads nothing."""
+    listed: list[dict[str, Any]] = []
+    original = DriveItemData.from_graph_json
 
-    def spy(
-        page: DriveDeltaPage, start: datetime | None, end: datetime | None
-    ) -> Generator[DriveItemData, None, None]:
-        nonlocal listed_files
-        for item in page.items:
-            assert DRIVE_ITEM_DOWNLOAD_URL_PROPERTY not in item.to_graph_json()
-            listed_files += 0 if item.is_folder else 1
-        yield from original(page, start, end)
+    def spy(item: dict[str, Any]) -> DriveItemData:
+        listed.append(item)
+        return original(item)
 
-    monkeypatch.setattr(sharepoint_connector, "iter_delta_page_files", spy)
+    monkeypatch.setattr(DriveItemData, "from_graph_json", spy)
 
-    listing = list_stubs(mock_sharepoint.build_connector())
+    full = list_stubs(own_mock_sharepoint.build_connector())
+    since = time.time() - 1
+    own_mock_sharepoint.touch(sorted(own_mock_sharepoint.supported_file_ids())[:2])
+    incremental = list_stubs(own_mock_sharepoint.build_connector(), start=since)
 
-    assert listing.stubs and listed_files
+    assert full.stubs and incremental.stubs
+    assert own_mock_sharepoint.op_count("graph.drive.children") > 0
+    assert listed
+    assert not [item for item in listed if DRIVE_ITEM_DOWNLOAD_URL_PROPERTY in item]
 
 
 def test_the_stubs_match_the_documents_of_the_fetching_path(
